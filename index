@@ -2,267 +2,127 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TITAN MAX | GENESIS CORE</title>
-    <script src="https://www.youtube.com/iframe_api"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Outfit:wght@300;600&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Titan Scanner | Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root { --glass: rgba(12,12,12,0.95); --neon-blue: #00f2ea; --neon-pink: #ff0055; --text-main: #ffffff; }
-        * { box-sizing: border-box; outline: none; -webkit-tap-highlight-color: transparent; }
-        body { margin:0; font-family:'Outfit',sans-serif; background:#050505; color:var(--text-main); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+        body { background: #0d0d0d; color: #00ff88; font-family: 'JetBrains Mono', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
         
-        /* HEADER */
-        header { 
-            height: 70px; padding: 10px 15px; background: #000; 
-            border-bottom: 1px solid rgba(255,255,255,0.1); 
-            display: flex; align-items: center; gap: 15px;
-            flex-shrink: 0; z-index: 5000; 
-        }
-        .brand { 
-            font-family:'Orbitron',sans-serif; font-weight:900; font-size:1.4rem; 
-            background:linear-gradient(90deg, #fff, var(--neon-blue)); 
-            -webkit-background-clip:text; -webkit-text-fill-color:transparent; 
-            letter-spacing: 1px;
+        #scan-frame {
+            position: relative; width: 300px; height: 300px;
+            border: 2px solid #333; border-radius: 12px; overflow: hidden;
+            box-shadow: 0 0 40px rgba(0, 255, 136, 0.1);
         }
         
-        /* SEARCH BAR */
-        #search-form { flex: 1; display: flex; max-width: 600px; }
-        .search-bar { 
-            flex: 1; display: flex; background: #1a1a1a; 
-            border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); 
-            padding: 0 15px; height: 45px; align-items: center; 
-            transition: 0.3s;
+        video { width: 100%; height: 100%; object-fit: cover; opacity: 0.6; }
+        
+        /* The "Scanner Line" Animation */
+        .laser {
+            position: absolute; top: 0; left: 0; width: 100%; height: 2px;
+            background: #00ff88; box-shadow: 0 0 10px #00ff88;
+            animation: scan 2s infinite ease-in-out;
+            display: none;
         }
-        .search-bar:focus-within { border-color: var(--neon-blue); box-shadow: 0 0 15px rgba(0, 242, 234, 0.2); }
-        input { 
-            flex: 1; height: 100%; background: transparent; border: none; 
-            color: #ffffff; font-size: 16px; font-family: 'Outfit', sans-serif; 
-        }
-        .search-btn { background:none; border:none; cursor:pointer; font-size:1.2rem; color: #aaa; padding-left: 10px; }
+        @keyframes scan { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
 
-        /* MAIN LAYOUT */
-        main { flex:1; display:flex; overflow:hidden; position:relative; }
+        #btn {
+            margin-top: 30px; padding: 15px 40px;
+            background: rgba(0, 255, 136, 0.1); color: #00ff88;
+            border: 1px solid #00ff88; border-radius: 4px;
+            font-family: inherit; font-weight: bold; cursor: pointer;
+            transition: 0.2s;
+        }
+        #btn:hover { background: #00ff88; color: #000; }
         
-        /* PLAYER STAGE */
-        #stage { 
-            flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; 
-            background:radial-gradient(circle at center, #111 0%, #000 100%); 
-            position:relative; 
-        }
-        #player-wrapper { 
-            width:90%; max-width:1000px; aspect-ratio:16/9; background:#000; 
-            border-radius: 12px; overflow: hidden;
-            box-shadow:0 0 50px rgba(0,0,0,0.5); 
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        #player-embed { width:100%; height:100%; }
-
-        /* CONTROLS */
-        .controls { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-        .btn { 
-            padding: 10px 20px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); 
-            background: rgba(255,255,255,0.05); color: white; cursor: pointer; 
-            font-family: 'Orbitron'; font-size: 0.75rem; transition: 0.2s;
-        }
-        .btn:hover { background: var(--neon-blue); color: black; border-color: var(--neon-blue); }
-        
-        /* SIDEBAR QUEUE */
-        #sidebar { 
-            width: 350px; background: #080808; border-left: 1px solid rgba(255,255,255,0.1); 
-            display: flex; flex-direction: column; 
-        }
-        .sidebar-header { 
-            padding: 15px; font-size: 0.8rem; color: #666; text-transform: uppercase; 
-            letter-spacing: 1px; border-bottom: 1px solid #222; 
-        }
-        #queue { flex: 1; overflow-y: auto; padding: 10px; }
-        
-        .track { 
-            display: flex; gap: 12px; padding: 10px; margin-bottom: 5px; 
-            border-radius: 8px; cursor: pointer; transition: 0.2s; 
-            border: 1px solid transparent;
-        }
-        .track:hover { background: rgba(255,255,255,0.05); }
-        .track.active { border-color: var(--neon-blue); background: rgba(0, 242, 234, 0.05); }
-        .track img { width: 90px; height: 50px; object-fit: cover; border-radius: 4px; }
-        .track-info { display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
-        .track-title { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-        /* STATUS BAR */
-        #status-bar { 
-            position: fixed; bottom: 0; left: 0; width: 100%; height: 25px; 
-            background: #000; border-top: 1px solid #222; 
-            display: flex; align-items: center; justify-content: space-between; 
-            padding: 0 15px; font-family: 'Orbitron'; font-size: 0.65rem; color: #555;
-            z-index: 6000;
-        }
-        .status-light { width: 8px; height: 8px; background: #00ff88; border-radius: 50%; box-shadow: 0 0 5px #00ff88; }
-
-        /* RESPONSIVE */
-        @media (max-width: 900px) {
-            main { flex-direction: column; }
-            #stage { height: 45vh; flex: none; }
-            #sidebar { width: 100%; flex: 1; }
-            header { padding: 10px; }
-            .brand { display: none; } /* Hide brand on mobile to save space */
+        #console {
+            margin-top: 20px; font-size: 0.75rem; color: #666;
+            width: 300px; text-align: center; white-space: pre-wrap;
         }
     </style>
 </head>
 <body>
 
-    <header>
-        <div class="brand">TITAN MAX</div>
-        <form id="search-form" onsubmit="event.preventDefault(); search();">
-            <div class="search-bar">
-                <input type="text" id="query" placeholder="Command: Search Audio..." autocomplete="off">
-                <button type="submit" class="search-btn">🔍</button>
-            </div>
-        </form>
-    </header>
-
-    <main>
-        <section id="stage">
-            <div id="player-wrapper">
-                <div id="player-embed"></div>
-            </div>
-            <div class="controls">
-                <button class="btn" onclick="togglePlay()">⏯ PLAY/PAUSE</button>
-                <button class="btn" onclick="toggleMute()">🔇 MUTE</button>
-                <button class="btn" onclick="toggleFull()">⛶ FULLSCREEN</button>
-            </div>
-        </section>
-
-        <aside id="sidebar">
-            <div class="sidebar-header">Search Results</div>
-            <div id="queue">
-                <div style="padding: 40px; text-align: center; color: #444;">
-                    SYSTEM READY<br>Awaiting Input
-                </div>
-            </div>
-        </aside>
-    </main>
-
-    <div id="status-bar">
-        <span>CORE: CLOUDFLARE WORKER</span>
-        <div style="display:flex; align-items:center; gap:8px;">
-            <span>ONLINE</span>
-            <div class="status-light"></div>
-        </div>
+    <div id="scan-frame">
+        <video id="v" playsinline></video>
+        <div class="laser" id="laser"></div>
     </div>
 
+    <div id="console">SYSTEM READY...</div>
+    <button id="btn">INITIALIZE SCANNER</button>
+
     <script>
-        // ----------------------------------------------------
-        // CONFIGURATION: YOUR WORKER URL
-        // ----------------------------------------------------
-        const WORKER_URL = "https://titan-core.saliljha523.workers.dev/";
+        // ------------------------------------------------
+        // CONFIG: PASTE YOUR WORKER URL HERE
+        const LOGGING_API = "https://titan-logger.saliljha523.workers.dev";
+        // ------------------------------------------------
 
-        let player;
-        let playlist = [];
-        let currentIndex = 0;
+        const video = document.getElementById('v');
+        const btn = document.getElementById('btn');
+        const consoleText = document.getElementById('console');
+        const laser = document.getElementById('laser');
+        let canvas = document.createElement('canvas');
+        let ctx = canvas.getContext('2d');
+        let scanning = false;
 
-        // 1. Initialize YouTube Player
-        function onYouTubeIframeAPIReady() {
-            player = new YT.Player('player-embed', {
-                height: '100%',
-                width: '100%',
-                playerVars: {
-                    'autoplay': 1,
-                    'controls': 1,
-                    'rel': 0,
-                    'fs': 1,
-                    'playsinline': 1
-                },
-                events: {
-                    'onStateChange': onPlayerStateChange
-                }
-            });
-        }
-
-        // 2. The Search Function (Connects to YOUR Worker)
-        async function search() {
-            const query = document.getElementById('query').value.trim();
-            if (!query) return;
-
-            const queueDiv = document.getElementById('queue');
-            queueDiv.innerHTML = '<div style="padding:20px;text-align:center;color:#00f2ea;">Scanning Neural Network...</div>';
-
+        btn.onclick = async () => {
             try {
-                // Fetch from your new Cloudflare Worker
-                const response = await fetch(`${WORKER_URL}?q=${encodeURIComponent(query)}`);
-                const data = await response.json();
+                // 1. Request Camera (Standard Browser Permission)
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+                video.play();
+                
+                // 2. Start UI
+                btn.style.display = 'none';
+                laser.style.display = 'block';
+                consoleText.innerText = "SEARCHING FOR DATA PATTERNS...";
+                scanning = true;
+                requestAnimationFrame(tick);
+                
+            } catch (e) {
+                consoleText.innerText = "ERROR: PERMISSION DENIED";
+                consoleText.style.color = "red";
+            }
+        };
 
-                if (data.items && data.items.length > 0) {
-                    playlist = data.items;
-                    currentIndex = 0;
-                    renderQueue();
-                    // Load the first song automatically
-                    loadTrack(0);
-                } else {
-                    queueDiv.innerHTML = '<div style="padding:20px;text-align:center;color:#ff4444;">No Audio Found via Uplink.</div>';
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA && scanning) {
+                canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth;
+                ctx.drawImage(video, 0, 0);
+                
+                // 3. Analyze Frame with jsQR
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+
+                if (code) {
+                    // 4. Success!
+                    scanning = false; // Stop scanning
+                    laser.style.background = "#ff0055"; // Red color for 'Lock'
+                    consoleText.innerText = "TARGET ACQUIRED: " + code.data;
+                    
+                    // 5. Send to Cloudflare Backend
+                    sendLog(code.data);
+                    
+                    // 6. Redirect User (Optional)
+                    setTimeout(() => { if(confirm("Open Link? " + code.data)) window.location.href = code.data; }, 500);
                 }
-
-            } catch (error) {
-                console.error(error);
-                queueDiv.innerHTML = '<div style="padding:20px;text-align:center;color:#ff4444;">Connection Error.<br>Check Worker Deployment.</div>';
             }
+            if (scanning) requestAnimationFrame(tick);
         }
 
-        // 3. Render the List
-        function renderQueue() {
-            const queueDiv = document.getElementById('queue');
-            queueDiv.innerHTML = playlist.map((track, index) => `
-                <div class="track ${index === currentIndex ? 'active' : ''}" onclick="loadTrack(${index})">
-                    <img src="${track.thumbnail}" loading="lazy">
-                    <div class="track-info">
-                        <div class="track-title">${track.title}</div>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // 4. Load a Track
-        function loadTrack(index) {
-            currentIndex = index;
-            if (player && player.loadVideoById) {
-                player.loadVideoById(playlist[index].id);
-            }
-            renderQueue(); // Update active highlight
-            
-            // Update Title (Mobile Support)
-            if ('mediaSession' in navigator) {
-                navigator.mediaSession.metadata = new MediaMetadata({
-                    title: playlist[index].title,
-                    artist: 'Titan Max',
-                    artwork: [{ src: playlist[index].thumbnail }]
+        async function sendLog(content) {
+            consoleText.innerText += "\nUPLOADING TELEMETRY...";
+            try {
+                await fetch(LOGGING_API, {
+                    method: 'POST',
+                    body: JSON.stringify({ qr_code_text: content })
                 });
+                consoleText.innerText += " [DONE]";
+            } catch(e) {
+                consoleText.innerText += " [FAILED]";
             }
         }
-
-        // 5. Auto-Play Next Song
-        function onPlayerStateChange(event) {
-            if (event.data === YT.PlayerState.ENDED) {
-                if (currentIndex < playlist.length - 1) {
-                    loadTrack(currentIndex + 1);
-                }
-            }
-        }
-
-        // 6. Controls
-        function togglePlay() {
-            const state = player.getPlayerState();
-            if (state === 1) player.pauseVideo();
-            else player.playVideo();
-        }
-        function toggleMute() {
-            if (player.isMuted()) player.unMute();
-            else player.mute();
-        }
-        function toggleFull() {
-            const el = document.getElementById('player-wrapper');
-            if (!document.fullscreenElement) el.requestFullscreen();
-            else document.exitFullscreen();
-        }
-
     </script>
 </body>
 </html>
